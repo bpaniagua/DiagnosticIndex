@@ -63,6 +63,7 @@ typedef DataManager<vtkPolyData> DataManagerType;
 typedef PCAModelBuilder<vtkPolyData> ModelBuilderType;
 typedef StatisticalModel<vtkPolyData> StatisticalModelType;
 typedef std::vector<std::string> StringVectorType;
+typedef Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic> Matrixtype;
 
 int getdir (std::string dir, std::vector<std::string> &files, const std::string& extension=".*") {
 vtkDirectory *directory = vtkDirectory::New();
@@ -158,7 +159,7 @@ StatisticalModelType* buildSSM (std::string datadir, std::string filenamereferen
     // Calling the build model with a list of samples from the data manager, returns a new model.
     // The second parameter to BuildNewModel is the variance of the noise on our data
     ModelBuilderType* modelBuilder = ModelBuilderType::Create();
-    StatisticalModelType* model = modelBuilder->BuildNewModel(dataManager->GetData(), 0);
+    StatisticalModelType* model = modelBuilder->BuildNewModel(dataManager->GetData(), 0.01);
 
     std::cout << "Total variance " << model->GetPCAVarianceVector().sum() << " number of Eigenmodes " << model->GetPCAVarianceVector().size() << std::endl;
     return model;
@@ -196,7 +197,7 @@ StatisticalModelType* buildSSMCrossvalidation (std::string datadir, std::string 
     // Calling the build model with a list of samples from the data manager, returns a new model.
     // The second parameter to BuildNewModel is the variance of the noise on our data
     ModelBuilderType* modelBuilder = ModelBuilderType::Create();
-    StatisticalModelType* model = modelBuilder->BuildNewModel(dataManager->GetData(), 0);
+    StatisticalModelType* model = modelBuilder->BuildNewModel(dataManager->GetData(), 0.01);
 
   //  std::cout << "Total variance " << model->GetPCAVarianceVector().sum() << " number of Eigenmodes " << model->GetPCAVarianceVector().size() << std::endl;
     return model;
@@ -219,26 +220,29 @@ void analyzeVariance (StatisticalModelType* model)
     }
 }
 
-double ComputeOAindex (VectorType ShapeLoads, int numOfEigenmodes,double totalVarGroup, double totalVarPooled)
+double ComputeOAindex (StatisticalModelType* model, vtkPolyData* sample, double totalVarPooled, int numOfEigenmodes)
 {
-      double OAindex;
-      double sum = 0;
+    VectorType ShapeLoads = model->ComputeCoefficientsForDataset(sample);
+    VectorType eigenVectors = model->GetPCAVarianceVector();
 
-      double finalnumberofeigenmodes;
+    double OAindex;
+    double sum = 0;
 
-      if (numOfEigenmodes == -1)
-          finalnumberofeigenmodes = ShapeLoads.size();
-      else
-          finalnumberofeigenmodes = numOfEigenmodes;
+    double finalnumberofeigenmodes;
 
-      for (unsigned l = 0 ; l < finalnumberofeigenmodes ; l++)
-      {
-          sum = sum + ( pow( (ShapeLoads(l) * (totalVarGroup/totalVarPooled)) ,2) );
-      }
+    if (numOfEigenmodes == -1)
+        finalnumberofeigenmodes = ShapeLoads.size();
+    else
+        finalnumberofeigenmodes = numOfEigenmodes;
 
-      OAindex = sqrt( sum )/finalnumberofeigenmodes;
+    for (unsigned l = 0 ; l < finalnumberofeigenmodes ; l++)
+    {
+        sum = sum + ( pow(ShapeLoads(l),2) );
+    }
 
-      return OAindex;
+    OAindex = sqrt( sum )/finalnumberofeigenmodes;
+
+    return OAindex;
 }
 
 double ComputeOAindex2 (StatisticalModelType* model, vtkPolyData* sample, double totalVarPooled, int numOfEigenmodes)
@@ -281,21 +285,22 @@ int main (int argc, char ** argv)
         return 0;
     }
 
-    std::string GroupLUT("/NIRAL/projects5/CMF/TMJR01/OAIndex/Code/Data/Grouping/LookUpGroup2.csv");
+    std::string GroupLUT("/NIRAL/projects5/CMF/TMJR01/OAIndex/Code/DataCO/Grouping/LookUpGroup3.csv");
+    std::string datadirModels("/NIRAL/projects5/CMF/TMJR01/OAIndex/Code/Data/Grouping/HD5Groups");
 
-    std::string datadirHC("/NIRAL/projects5/CMF/TMJR01/OAIndex/Code/Data/ControlGroup");
-    std::string datadirOA("/NIRAL/projects5/CMF/TMJR01/OAIndex/Code/Data/OA");
-    std::string datadirBoth("/NIRAL/projects5/CMF/TMJR01/OAIndex/Code/Data/Both");
+    std::string datadirHC("/NIRAL/projects5/CMF/TMJR01/OAIndex/Code/DataCO/ControlGroup");
+    std::string datadirOA("/NIRAL/projects5/CMF/TMJR01/OAIndex/Code/DataCO/OA");
+    std::string datadirBoth("/NIRAL/projects5/CMF/TMJR01/OAIndex/Code/DataCO/Both");
 
-    std::string datadirG01("/NIRAL/projects5/CMF/TMJR01/OAIndex/Code/Data/Grouping/G01");
-    std::string datadirG02("/NIRAL/projects5/CMF/TMJR01/OAIndex/Code/Data/Grouping/G02");
-    std::string datadirG03("/NIRAL/projects5/CMF/TMJR01/OAIndex/Code/Data/Grouping/G03");
-    std::string datadirG04("/NIRAL/projects5/CMF/TMJR01/OAIndex/Code/Data/Grouping/G04");
-    std::string datadirG05("/NIRAL/projects5/CMF/TMJR01/OAIndex/Code/Data/Grouping/G05");
-    std::string datadirG06("/NIRAL/projects5/CMF/TMJR01/OAIndex/Code/Data/Grouping/G06");
-    std::string datadirG07("/NIRAL/projects5/CMF/TMJR01/OAIndex/Code/Data/Grouping/G07");
+    std::string datadirG01("/NIRAL/projects5/CMF/TMJR01/OAIndex/Code/DataCO/Grouping/G01");
+    std::string datadirG02("/NIRAL/projects5/CMF/TMJR01/OAIndex/Code/DataCO/Grouping/G02");
+    std::string datadirG03("/NIRAL/projects5/CMF/TMJR01/OAIndex/Code/DataCO/Grouping/G03");
+    std::string datadirG04("/NIRAL/projects5/CMF/TMJR01/OAIndex/Code/DataCO/Grouping/G04");
+    std::string datadirG05("/NIRAL/projects5/CMF/TMJR01/OAIndex/Code/DataCO/Grouping/G05");
+    std::string datadirG06("/NIRAL/projects5/CMF/TMJR01/OAIndex/Code/DataCO/Grouping/G06");
+    std::string datadirG07("/NIRAL/projects5/CMF/TMJR01/OAIndex/Code/DataCO/Grouping/G07");
 
-    std::string datadirRepresenters("/NIRAL/projects5/CMF/TMJR01/OAIndex/Code/Data/Representers");
+    std::string datadirRepresenters("/NIRAL/projects5/CMF/TMJR01/OAIndex/Code/DataCO/Representers");
 
     //Read .CSV look up table with group information and VTK
     vtkSmartPointer<vtkDelimitedTextReader> CSVreader = vtkSmartPointer<vtkDelimitedTextReader>::New();
@@ -323,18 +328,25 @@ int main (int argc, char ** argv)
 
     std::string representerG01 = datadirRepresenters + "/avgG01.vtk";
     StatisticalModelType* modelG01 = buildSSM(datadirG01,representerG01 );
+
     std::string representerG02 = datadirRepresenters + "/avgG02.vtk";
     StatisticalModelType* modelG02 = buildSSM(datadirG02,representerG02);
+
     std::string representerG03 = datadirRepresenters + "/avgG03.vtk";
     StatisticalModelType* modelG03 = buildSSM(datadirG03,representerG03);
+
     std::string representerG04 = datadirRepresenters + "/avgG04.vtk";
     StatisticalModelType* modelG04 = buildSSM(datadirG04,representerG04);
+
     std::string representerG05 = datadirRepresenters + "/avgG05.vtk";
     StatisticalModelType* modelG05 = buildSSM(datadirG05,representerG05);
+
     std::string representerG06 = datadirRepresenters + "/avgG06.vtk";
     StatisticalModelType* modelG06 = buildSSM(datadirG06,representerG06);
+
     std::string representerG07 = datadirRepresenters + "/avgG07.vtk";
     StatisticalModelType* modelG07 = buildSSM(datadirG07,representerG07);
+
     std::string representerHC = datadirRepresenters + "/avgHC.vtk";
     StatisticalModelType* modelHC = buildSSM(datadirHC,representerHC);
 
@@ -344,79 +356,12 @@ int main (int argc, char ** argv)
 
     //################################################
 
-    Eigen::MatrixXd OAindex_all (NumOfGroups,filenamesToClassify.size());
+    MatrixType OAindex_all (NumOfGroups,filenamesToClassify.size());
+    MatrixType OAindex_all_idx (NumOfGroups,filenamesToClassify.size());
     VectorType OAindex (filenamesToClassify.size());
     VectorType OAindex_groupAssignment (filenamesToClassify.size());
     VectorType OAindex_groupReal (filenamesToClassify.size());
 
-   /* vtkPolyDataReader* reader = vtkPolyDataReader::New();
-    std::string ShapeOAFilename = datadirBoth + "/" + filenamesToClassify[150];
-    reader->SetFileName(ShapeOAFilename.c_str());
-    reader->Update();
-    vtkPolyData* VTKShapeOA = vtkPolyData::New();
-    VTKShapeOA->ShallowCopy(reader->GetOutput());
-
-
-    std::cout << "Probabilities of " << filenamesToClassify[150] << std::endl;
-    std::cout << "G01 " << modelG01->ComputeProbabilityOfDataset(VTKShapeOA) << std::endl;
-    std::cout << "G02 " << modelG02->ComputeProbabilityOfDataset(VTKShapeOA) << std::endl;
-    std::cout << "G03 " << modelG03->ComputeProbabilityOfDataset(VTKShapeOA) << std::endl;
-    std::cout << "G04 " << modelG04->ComputeProbabilityOfDataset(VTKShapeOA) << std::endl;
-    std::cout << "G05 " << modelG05->ComputeProbabilityOfDataset(VTKShapeOA) << std::endl;
-    std::cout << "G06 " << modelG06->ComputeProbabilityOfDataset(VTKShapeOA) << std::endl;
-    std::cout << "G07 " << modelG07->ComputeProbabilityOfDataset(VTKShapeOA) << std::endl;
-    std::cout << "HC " << modelHC->ComputeProbabilityOfDataset(VTKShapeOA) << std::endl;
-    std::cout << "Both " << modelBoth->ComputeProbabilityOfDataset(VTKShapeOA) << std::endl;
-
-    std::cout << "Mahalanobis of " << filenamesToClassify[150] << std::endl;
-    std::cout << "G01 " << modelG01->ComputeMahalanobisDistanceForDataset(VTKShapeOA) << std::endl;
-    std::cout << "G02 " << modelG02->ComputeMahalanobisDistanceForDataset(VTKShapeOA) << std::endl;
-    std::cout << "G03 " << modelG03->ComputeMahalanobisDistanceForDataset(VTKShapeOA) << std::endl;
-    std::cout << "G04 " << modelG04->ComputeMahalanobisDistanceForDataset(VTKShapeOA) << std::endl;
-    std::cout << "G05 " << modelG05->ComputeMahalanobisDistanceForDataset(VTKShapeOA) << std::endl;
-    std::cout << "G06 " << modelG06->ComputeMahalanobisDistanceForDataset(VTKShapeOA) << std::endl;
-    std::cout << "G07 " << modelG07->ComputeMahalanobisDistanceForDataset(VTKShapeOA) << std::endl;
-    std::cout << "HC " << modelHC->ComputeMahalanobisDistanceForDataset(VTKShapeOA) << std::endl;
-    std::cout << "Both " << modelBoth->ComputeMahalanobisDistanceForDataset(VTKShapeOA) << std::endl;
-
-    VectorType ShapeOAVectorLoadsG01 = modelG01->ComputeCoefficientsForDataset(VTKShapeOA);
-    VectorType ShapeOAVectorLoadsG02 = modelG02->ComputeCoefficientsForDataset(VTKShapeOA);
-    VectorType ShapeOAVectorLoadsG03 = modelG03->ComputeCoefficientsForDataset(VTKShapeOA);
-    VectorType ShapeOAVectorLoadsG04 = modelG04->ComputeCoefficientsForDataset(VTKShapeOA);
-    VectorType ShapeOAVectorLoadsG05 = modelG05->ComputeCoefficientsForDataset(VTKShapeOA);
-    VectorType ShapeOAVectorLoadsG06 = modelG06->ComputeCoefficientsForDataset(VTKShapeOA);
-    VectorType ShapeOAVectorLoadsG07 = modelG07->ComputeCoefficientsForDataset(VTKShapeOA);
-    VectorType ShapeOAVectorLoadsHC = modelHC->ComputeCoefficientsForDataset(VTKShapeOA);
-    VectorType ShapeOAVectorLoadsBoth = modelBoth->ComputeCoefficientsForDataset(VTKShapeOA);
-
-    //Computing variances per group and pooled
-    totalGroupVariances(0) = modelG01->GetPCAVarianceVector().sum();
-    totalGroupVariances(1) = modelG02->GetPCAVarianceVector().sum();
-    totalGroupVariances(2) = modelG03->GetPCAVarianceVector().sum();
-    totalGroupVariances(3) = modelG04->GetPCAVarianceVector().sum();
-    totalGroupVariances(4) = modelG05->GetPCAVarianceVector().sum();
-    totalGroupVariances(5) = modelG06->GetPCAVarianceVector().sum();
-    totalGroupVariances(6) = modelG07->GetPCAVarianceVector().sum();
-    totalGroupVariances(7) = modelHC->GetPCAVarianceVector().sum();
-
-    double sum = 0;
-    for (int i = 0; i <totalGroupVariances.size(); i++)
-    {
-        sum = sum + totalGroupVariances(i);
-    }
-    totalVarPooled = sum/totalGroupVariances.size();
-
-    std::cout << "OAindex of " << filenamesToClassify[150] << std::endl;
-    std::cout << "G01 " << ComputeOAindex(ShapeOAVectorLoadsG01,NumOfEigenmodes,totalGroupVariances(0),totalVarPooled) << std::endl;
-    std::cout << "G02 " << ComputeOAindex(ShapeOAVectorLoadsG02,NumOfEigenmodes,totalGroupVariances(1),totalVarPooled) << std::endl;
-    std::cout << "G03 " << ComputeOAindex(ShapeOAVectorLoadsG03,NumOfEigenmodes,totalGroupVariances(2),totalVarPooled) << std::endl;
-    std::cout << "G04 " << ComputeOAindex(ShapeOAVectorLoadsG04,NumOfEigenmodes,totalGroupVariances(3),totalVarPooled) << std::endl;
-    std::cout << "G05 " << ComputeOAindex(ShapeOAVectorLoadsG05,NumOfEigenmodes,totalGroupVariances(4),totalVarPooled) << std::endl;
-    std::cout << "G06 " << ComputeOAindex(ShapeOAVectorLoadsG06,NumOfEigenmodes,totalGroupVariances(5),totalVarPooled) << std::endl;
-    std::cout << "G07 " << ComputeOAindex(ShapeOAVectorLoadsG07,NumOfEigenmodes,totalGroupVariances(6),totalVarPooled) << std::endl;
-    std::cout << "HC " << ComputeOAindex(ShapeOAVectorLoadsHC,NumOfEigenmodes,totalGroupVariances(7),totalVarPooled) << std::endl;
-    std::cout << "Both " << ComputeOAindex(ShapeOAVectorLoadsBoth,NumOfEigenmodes,totalVarBoth,totalVarPooled) << std::endl;
-*/
     for (unsigned sample = 0 ; sample < filenamesToClassify.size() ; sample++)
     {
 
@@ -523,64 +468,44 @@ int main (int argc, char ** argv)
         // ###################################
 
         // Read ShapeOA in vtk format
-        vtkPolyDataReader* reader = vtkPolyDataReader::New();
         std::string ShapeOAFilename = datadirBoth + "/" + filenamesToClassify[sample];
-        reader->SetFileName(ShapeOAFilename.c_str());
-        reader->Update();
-        vtkPolyData* VTKShapeOA = vtkPolyData::New();
-        VTKShapeOA->ShallowCopy(reader->GetOutput());
-
-        VectorType ShapeOAVectorLoadsG01 = modelG01->ComputeCoefficientsForDataset(VTKShapeOA);
-        VectorType ShapeOAVectorLoadsG02 = modelG02->ComputeCoefficientsForDataset(VTKShapeOA);
-        VectorType ShapeOAVectorLoadsG03 = modelG03->ComputeCoefficientsForDataset(VTKShapeOA);
-        VectorType ShapeOAVectorLoadsG04 = modelG04->ComputeCoefficientsForDataset(VTKShapeOA);
-        VectorType ShapeOAVectorLoadsG05 = modelG05->ComputeCoefficientsForDataset(VTKShapeOA);
-        VectorType ShapeOAVectorLoadsG06 = modelG06->ComputeCoefficientsForDataset(VTKShapeOA);
-        VectorType ShapeOAVectorLoadsG07 = modelG07->ComputeCoefficientsForDataset(VTKShapeOA);
-        VectorType ShapeOAVectorLoadsHC = modelHC->ComputeCoefficientsForDataset(VTKShapeOA);
-      //  VectorType ShapeOAVectorLoadsBoth = modelBoth->ComputeCoefficientsForDataset(VTKShapeOA);
+        vtkPolyData* VTKShapeOA = loadVTKPolyData(ShapeOAFilename);
 
         double minOAindex = 99999999999999;
         double maxOAindex = -1;
         double groupAssignment = 0;
 
-        //OAindex_all(0,sample) = ComputeOAindex(ShapeOAVectorLoadsG01,NumOfEigenmodes,totalGroupVariances(0),totalVarPooled);
-        //OAindex_all(1,sample) = ComputeOAindex(ShapeOAVectorLoadsG02,NumOfEigenmodes,totalGroupVariances(1),totalVarPooled);
-        //OAindex_all(2,sample) = ComputeOAindex(ShapeOAVectorLoadsG03,NumOfEigenmodes,totalGroupVariances(2),totalVarPooled);
-        //OAindex_all(3,sample) = ComputeOAindex(ShapeOAVectorLoadsG04,NumOfEigenmodes,totalGroupVariances(3),totalVarPooled);
-        //OAindex_all(4,sample) = ComputeOAindex(ShapeOAVectorLoadsG05,NumOfEigenmodes,totalGroupVariances(4),totalVarPooled);
-        //OAindex_all(5,sample) = ComputeOAindex(ShapeOAVectorLoadsG06,NumOfEigenmodes,totalGroupVariances(5),totalVarPooled);
-        //OAindex_all(6,sample) = ComputeOAindex(ShapeOAVectorLoadsG07,NumOfEigenmodes,totalGroupVariances(6),totalVarPooled);
-        //OAindex_all(7,sample) = ComputeOAindex(ShapeOAVectorLoadsHC,NumOfEigenmodes,totalGroupVariances(7),totalVarPooled);
+        OAindex_all(0,sample) = ComputeOAindex(modelG01,VTKShapeOA,totalVarPooled,NumOfEigenmodes);
+        OAindex_all(1,sample) = ComputeOAindex(modelG02,VTKShapeOA,totalVarPooled,NumOfEigenmodes);
+        OAindex_all(2,sample) = ComputeOAindex(modelG03,VTKShapeOA,totalVarPooled,NumOfEigenmodes);
+        OAindex_all(3,sample) = ComputeOAindex(modelG04,VTKShapeOA,totalVarPooled,NumOfEigenmodes);
+        OAindex_all(4,sample) = ComputeOAindex(modelG05,VTKShapeOA,totalVarPooled,NumOfEigenmodes);
+        OAindex_all(5,sample) = ComputeOAindex(modelG06,VTKShapeOA,totalVarPooled,NumOfEigenmodes);
+        OAindex_all(6,sample) = ComputeOAindex(modelG07,VTKShapeOA,totalVarPooled,NumOfEigenmodes);
+        OAindex_all(7,sample) = ComputeOAindex(modelHC,VTKShapeOA,totalVarPooled,NumOfEigenmodes);
 
+        VectorType col = OAindex_all.col(sample);
+        std::sort(col.data(),col.data()+col.size());
 
-        OAindex_all(0,sample) = ComputeOAindex2(modelG01,VTKShapeOA,totalVarPooled,NumOfEigenmodes);
-        OAindex_all(1,sample) = ComputeOAindex2(modelG02,VTKShapeOA,totalVarPooled,NumOfEigenmodes);
-        OAindex_all(2,sample) = ComputeOAindex2(modelG03,VTKShapeOA,totalVarPooled,NumOfEigenmodes);
-        OAindex_all(3,sample) = ComputeOAindex2(modelG04,VTKShapeOA,totalVarPooled,NumOfEigenmodes);
-        OAindex_all(4,sample) = ComputeOAindex2(modelG05,VTKShapeOA,totalVarPooled,NumOfEigenmodes);
-        OAindex_all(5,sample) = ComputeOAindex2(modelG06,VTKShapeOA,totalVarPooled,NumOfEigenmodes);
-        OAindex_all(6,sample) = ComputeOAindex2(modelG07,VTKShapeOA,totalVarPooled,NumOfEigenmodes);
-        OAindex_all(7,sample) = ComputeOAindex2(modelHC,VTKShapeOA,totalVarPooled,NumOfEigenmodes);
-
-        for (int i = 0 ; i < NumOfGroups ; i ++ )
+        for (int i = 0 ; i < col.size() ; i ++ )
         {
-            if (OAindex_all(i,sample) < minOAindex)
+            for (int j = 0 ; j < col.size() ; j ++ )
             {
-                minOAindex = OAindex_all(i,sample);
-                groupAssignment = i+1;
+                if (OAindex_all(i,sample) == col(j))
+                {
+                    OAindex_all_idx(j,sample)=i+1;
+                }
             }
-
         }
 
-        OAindex(sample) = minOAindex;
-        OAindex_groupAssignment(sample) = groupAssignment;
+        OAindex(sample) = col(0);
+        OAindex_groupAssignment(sample) = OAindex_all_idx(0,sample);
         std::cout << "--------------------" << std::endl;
 
     }
 
     std::cout << "----- Writing OA index results -----" << std::endl;
-
+//
     std::ofstream outputOAindexAll;
     outputOAindexAll.open( "/NIRAL/projects5/CMF/TMJR01/OAIndex/Code/Results/OAindexAll_groups.csv" );
     outputOAindexAll << "GroupID,";
@@ -601,7 +526,7 @@ int main (int argc, char ** argv)
 
     std::ofstream outputOAindex;
     outputOAindex.open( argv[2] );
-    outputOAindex << "subjectID,OAindex,GroupAssignment,GroupReal,Classification" << std::endl;
+    outputOAindex << "subjectID,OAindex,GroupReal,GroupAssignment,Classification,2ndAssigGroup,3rdAssigGroup,4thAssigGroup,5thAssigGroup" << std::endl;
 
     int missclassifications = 0;
     for (int ij = 0; ij < OAindex.size(); ij ++)
@@ -612,7 +537,8 @@ int main (int argc, char ** argv)
             missclassified = 1;
             missclassifications++;
         }
-        outputOAindex << filenamesToClassify[ij] << "," << OAindex[ij] << "," << OAindex_groupAssignment[ij] << "," << OAindex_groupReal[ij] << "," << missclassified << std::endl;
+        outputOAindex << filenamesToClassify[ij] << "," << OAindex[ij] << "," << OAindex_groupReal[ij] <<"," << OAindex_groupAssignment[ij] <<
+                         "," << missclassified << "," << OAindex_all_idx(1,ij) << "," << OAindex_all_idx(2,ij) << "," << OAindex_all_idx(3,ij) << "," << OAindex_all_idx(4,ij)<< std::endl;
     }
     outputOAindex << "Number of missclassifications " << missclassifications << "/" << (missclassifications * 100) / filenamesToClassify.size() << "%" << std::endl;
     outputOAindex.close();
