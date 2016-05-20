@@ -8,5 +8,7 @@ include (${VTK_USE_FILE})
 include_directories(${statismo_INCLUDE_DIRS})
 link_directories( ${VTK_LIBRARY_DIRS} ${statismo_LIBRARY_DIRS})
 
+include_directories ( PNSCore )
+
 add_executable (diagnosticIndex DiagnosticIndex.cxx)
 target_link_libraries (diagnosticIndex ${VTK_LIBRARIES} ${statismo_LIBRARIES})
