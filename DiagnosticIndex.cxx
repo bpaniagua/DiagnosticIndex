@@ -285,22 +285,22 @@ int main (int argc, char ** argv)
         return 0;
     }
 
-    std::string GroupLUT("/NIRAL/projects5/CMF/TMJR01/OAIndex/Code/DataCO/Grouping/LookUpGroup3.csv");
+    std::string GroupLUT("/NIRAL/projects5/CMF/TMJR01/OAIndex/Code/DataCO-cog/Grouping/LookUpGroup3.csv");
     std::string datadirModels("/NIRAL/projects5/CMF/TMJR01/OAIndex/Code/Data/Grouping/HD5Groups");
 
-    std::string datadirHC("/NIRAL/projects5/CMF/TMJR01/OAIndex/Code/DataCO/ControlGroup");
-    std::string datadirOA("/NIRAL/projects5/CMF/TMJR01/OAIndex/Code/DataCO/OA");
-    std::string datadirBoth("/NIRAL/projects5/CMF/TMJR01/OAIndex/Code/DataCO/Both");
+    std::string datadirHC("/NIRAL/projects5/CMF/TMJR01/OAIndex/Code/DataCO-cog/ControlGroup");
+    std::string datadirOA("/NIRAL/projects5/CMF/TMJR01/OAIndex/Code/DataCO-cog/OA");
+    std::string datadirBoth("/NIRAL/projects5/CMF/TMJR01/OAIndex/Code/DataCO-cog/Both");
 
-    std::string datadirG01("/NIRAL/projects5/CMF/TMJR01/OAIndex/Code/DataCO/Grouping/G01");
-    std::string datadirG02("/NIRAL/projects5/CMF/TMJR01/OAIndex/Code/DataCO/Grouping/G02");
-    std::string datadirG03("/NIRAL/projects5/CMF/TMJR01/OAIndex/Code/DataCO/Grouping/G03");
-    std::string datadirG04("/NIRAL/projects5/CMF/TMJR01/OAIndex/Code/DataCO/Grouping/G04");
-    std::string datadirG05("/NIRAL/projects5/CMF/TMJR01/OAIndex/Code/DataCO/Grouping/G05");
-    std::string datadirG06("/NIRAL/projects5/CMF/TMJR01/OAIndex/Code/DataCO/Grouping/G06");
-    std::string datadirG07("/NIRAL/projects5/CMF/TMJR01/OAIndex/Code/DataCO/Grouping/G07");
+    std::string datadirG01("/NIRAL/projects5/CMF/TMJR01/OAIndex/Code/DataCO-cog/Grouping/G01");
+    std::string datadirG02("/NIRAL/projects5/CMF/TMJR01/OAIndex/Code/DataCO-cog/Grouping/G02");
+    std::string datadirG03("/NIRAL/projects5/CMF/TMJR01/OAIndex/Code/DataCO-cog/Grouping/G03");
+    std::string datadirG04("/NIRAL/projects5/CMF/TMJR01/OAIndex/Code/DataCO-cog/Grouping/G04");
+    std::string datadirG05("/NIRAL/projects5/CMF/TMJR01/OAIndex/Code/DataCO-cog/Grouping/G05");
+    std::string datadirG06("/NIRAL/projects5/CMF/TMJR01/OAIndex/Code/DataCO-cog/Grouping/G06");
+    std::string datadirG07("/NIRAL/projects5/CMF/TMJR01/OAIndex/Code/DataCO-cog/Grouping/G07");
 
-    std::string datadirRepresenters("/NIRAL/projects5/CMF/TMJR01/OAIndex/Code/DataCO/Representers");
+    std::string datadirRepresenters("/NIRAL/projects5/CMF/TMJR01/OAIndex/Code/DataCO-cog/Representers");
 
     //Read .CSV look up table with group information and VTK
     vtkSmartPointer<vtkDelimitedTextReader> CSVreader = vtkSmartPointer<vtkDelimitedTextReader>::New();
@@ -507,7 +507,7 @@ int main (int argc, char ** argv)
     std::cout << "----- Writing OA index results -----" << std::endl;
 //
     std::ofstream outputOAindexAll;
-    outputOAindexAll.open( "/NIRAL/projects5/CMF/TMJR01/OAIndex/Code/Results/OAindexAll_groups.csv" );
+    outputOAindexAll.open( "/NIRAL/projects5/CMF/TMJR01/OAIndex/Code/Results/OAindexAll_groups_cog.csv" );
     outputOAindexAll << "GroupID,";
     for (int ij = 0; ij < filenamesToClassify.size()-1; ij ++)
         outputOAindexAll << filenamesToClassify[ij] << "," ;
