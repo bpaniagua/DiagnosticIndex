@@ -131,6 +131,32 @@ bool is_file_exist(std::string fileName)
     return infile.good();
 }
 
+vtkPolyData* ScaleVTK (vtkPolyData* reference)
+{
+    unsigned cont_v = 0;
+
+    vtkSmartPointer<vtkPolyData> output = vtkSmartPointer<vtkPolyData>::New();
+    output->DeepCopy(reference);
+
+   /* vtkPoints* points = vtkPoints::New();
+    points = output->GetPoints();
+
+    for (unsigned i = 0 ; i < output->GetNumberOfPoints() ; i++)
+    {
+        double p[3];
+        p[0]=v(cont_v);
+        p[1]=v(cont_v+1);
+        p[2]=v(cont_v+2);
+        cont_v =  cont_v+3;
+
+        points->InsertPoint(i,p);
+    }
+
+    output->SetPoints(points);*/
+
+    return output;
+}
+
 StatisticalModelType* buildSSM (std::string datadir, std::string filenamereference)
 {
     StringVectorType filenames;
