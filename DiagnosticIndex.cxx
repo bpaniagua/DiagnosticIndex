@@ -133,26 +133,42 @@ bool is_file_exist(std::string fileName)
 
 vtkPolyData* ScaleVTK (vtkPolyData* reference)
 {
-    unsigned cont_v = 0;
+    // Sum up Original Points
+    double sum = 0;
 
-    vtkSmartPointer<vtkPolyData> output = vtkSmartPointer<vtkPolyData>::New();
-    output->DeepCopy(reference);
-
-   /* vtkPoints* points = vtkPoints::New();
-    points = output->GetPoints();
-
-    for (unsigned i = 0 ; i < output->GetNumberOfPoints() ; i++)
+    for (int i = 0; i < reference->GetNumberOfPoints(); i++)
     {
-        double p[3];
-        p[0]=v(cont_v);
-        p[1]=v(cont_v+1);
-        p[2]=v(cont_v+2);
-        cont_v =  cont_v+3;
+    double curPoint[3];
+    reference->GetPoint(i, curPoint);
+    for( unsigned int dim = 0; dim < 3; dim++ )
+        {
+          sum += curPoint[dim]*curPoint[dim];
+        }
 
-        points->InsertPoint(i,p);
     }
 
-    output->SetPoints(points);*/
+    //Calculate Scale
+    double scale = sqrt(sum) / (reference->GetNumberOfPoints()*3);
+
+    // Create a New Point Set "scaledpoint" with the scaled Values
+    vtkPoints * scaledpoints = vtkPoints::New();
+    scaledpoints = reference->GetPoints();
+
+    for( int pointID = 0; pointID < reference->GetNumberOfPoints(); pointID++ )
+      {
+        double curPoint[3];
+        reference->GetPoint(pointID, curPoint);
+        double scaledPoint[3];
+      for( unsigned int dim = 0; dim < 3; dim++ )
+        {
+        scaledPoint[dim] = curPoint[dim] / scale;
+        }
+      scaledpoints->SetPoint(pointID, scaledPoint);
+      }
+    // Set the scaled Points back to original mesh
+    vtkPolyData* output = vtkPolyData::New();
+    output->DeepCopy(reference);
+    output->SetPoints(scaledpoints);
 
     return output;
 }
@@ -175,12 +191,19 @@ StatisticalModelType* buildSSM (std::string datadir, std::string filenamereferen
     for (unsigned i = 0; i < filenames.size() ; i++)
     {
         vtkPolyData* dataset = loadVTKPolyData(datadir + "/" + filenames[i]);
+        vtkPolyData* datasetS = ScaleVTK(dataset);
         // We provde the filename as a second argument.
         // It will be written as metadata, and allows us to more easily figure out what we did later.
-        dataManager->AddDataset(dataset, filenames[i]);
+
+        //saveSample(datasetS,"/Users/bpaniagua/Work/Projects/CMF/TMJR01/OAIndex/Code/DiagnosticIndex-build",filenames[i]);
+
+        dataManager->AddDataset(datasetS, filenames[i]);
+
         // it is save to delete the dataset after it was added, as the datamanager direclty copies it.
         dataset->Delete();
+        datasetS->Delete();
     }
+
     // To actually build a model, we need to create a model builder object.
     // Calling the build model with a list of samples from the data manager, returns a new model.
     // The second parameter to BuildNewModel is the variance of the noise on our data
@@ -211,11 +234,13 @@ StatisticalModelType* buildSSMCrossvalidation (std::string datadir, std::string 
         if (filename.compare(filenames[i]) != 0)
         {
             vtkPolyData* dataset = loadVTKPolyData(datadir + "/" + filenames[i]);
+            vtkPolyData* datasetS = ScaleVTK(dataset);
             // We provde the filename as a second argument.
             // It will be written as metadata, and allows us to more easily figure out what we did later.
-            dataManager->AddDataset(dataset, filenames[i]);
+            dataManager->AddDataset(datasetS, filenames[i]);
             // it is save to delete the dataset after it was added, as the datamanager direclty copies it.
             dataset->Delete();
+            datasetS->Delete();
         }
 
     }
@@ -311,22 +336,22 @@ int main (int argc, char ** argv)
         return 0;
     }
 
-    std::string GroupLUT("/NIRAL/projects5/CMF/TMJR01/OAIndex/Code/DataCO-cog/Grouping/LookUpGroup3.csv");
-    std::string datadirModels("/NIRAL/projects5/CMF/TMJR01/OAIndex/Code/Data/Grouping/HD5Groups");
+    std::string GroupLUT("/Users/bpaniagua/Work/Projects/CMF/TMJR01/OAIndex/Code/DataCO-cog/Grouping/LookUpGroup3.csv");
+    std::string datadirModels("/Users/bpaniagua/Work/Projects/CMF/TMJR01/OAIndex/Code/Data/Grouping/HD5Groups");
 
-    std::string datadirHC("/NIRAL/projects5/CMF/TMJR01/OAIndex/Code/DataCO-cog/ControlGroup");
-    std::string datadirOA("/NIRAL/projects5/CMF/TMJR01/OAIndex/Code/DataCO-cog/OA");
-    std::string datadirBoth("/NIRAL/projects5/CMF/TMJR01/OAIndex/Code/DataCO-cog/Both");
+    std::string datadirHC("/Users/bpaniagua/Work/Projects/CMF/TMJR01/OAIndex/Code/DataCO-cog/ControlGroup");
+    std::string datadirOA("/Users/bpaniagua/Work/Projects/CMF/TMJR01/OAIndex/Code/DataCO-cog/OA");
+    std::string datadirBoth("/Users/bpaniagua/Work/Projects/CMF/TMJR01/OAIndex/Code/DataCO-cog/Both");
 
-    std::string datadirG01("/NIRAL/projects5/CMF/TMJR01/OAIndex/Code/DataCO-cog/Grouping/G01");
-    std::string datadirG02("/NIRAL/projects5/CMF/TMJR01/OAIndex/Code/DataCO-cog/Grouping/G02");
-    std::string datadirG03("/NIRAL/projects5/CMF/TMJR01/OAIndex/Code/DataCO-cog/Grouping/G03");
-    std::string datadirG04("/NIRAL/projects5/CMF/TMJR01/OAIndex/Code/DataCO-cog/Grouping/G04");
-    std::string datadirG05("/NIRAL/projects5/CMF/TMJR01/OAIndex/Code/DataCO-cog/Grouping/G05");
-    std::string datadirG06("/NIRAL/projects5/CMF/TMJR01/OAIndex/Code/DataCO-cog/Grouping/G06");
-    std::string datadirG07("/NIRAL/projects5/CMF/TMJR01/OAIndex/Code/DataCO-cog/Grouping/G07");
+    std::string datadirG01("/Users/bpaniagua/Work/Projects/CMF/TMJR01/OAIndex/Code/DataCO-cog/Grouping/G01");
+    std::string datadirG02("/Users/bpaniagua/Work/Projects/CMF/TMJR01/OAIndex/Code/DataCO-cog/Grouping/G02");
+    std::string datadirG03("/Users/bpaniagua/Work/Projects/CMF/TMJR01/OAIndex/Code/DataCO-cog/Grouping/G03");
+    std::string datadirG04("/Users/bpaniagua/Work/Projects/CMF/TMJR01/OAIndex/Code/DataCO-cog/Grouping/G04");
+    std::string datadirG05("/Users/bpaniagua/Work/Projects/CMF/TMJR01/OAIndex/Code/DataCO-cog/Grouping/G05");
+    std::string datadirG06("/Users/bpaniagua/Work/Projects/CMF/TMJR01/OAIndex/Code/DataCO-cog/Grouping/G06");
+    std::string datadirG07("/Users/bpaniagua/Work/Projects/CMF/TMJR01/OAIndex/Code/DataCO-cog/Grouping/G07");
 
-    std::string datadirRepresenters("/NIRAL/projects5/CMF/TMJR01/OAIndex/Code/DataCO-cog/Representers");
+    std::string datadirRepresenters("/Users/bpaniagua/Work/Projects/CMF/TMJR01/OAIndex/Code/DataCO-cog/Representers");
 
     //Read .CSV look up table with group information and VTK
     vtkSmartPointer<vtkDelimitedTextReader> CSVreader = vtkSmartPointer<vtkDelimitedTextReader>::New();
@@ -533,7 +558,7 @@ int main (int argc, char ** argv)
     std::cout << "----- Writing OA index results -----" << std::endl;
 //
     std::ofstream outputOAindexAll;
-    outputOAindexAll.open( "/NIRAL/projects5/CMF/TMJR01/OAIndex/Code/Results/OAindexAll_groups_cog.csv" );
+    outputOAindexAll.open( "/Users/bpaniagua/Work/Projects/CMF/TMJR01/OAIndex/Code/Results/OAindexAll_groups_cog_scale.csv" );
     outputOAindexAll << "GroupID,";
     for (int ij = 0; ij < filenamesToClassify.size()-1; ij ++)
         outputOAindexAll << filenamesToClassify[ij] << "," ;
@@ -551,7 +576,7 @@ int main (int argc, char ** argv)
     outputOAindexAll.close();
 
     std::ofstream outputOAindex;
-    outputOAindex.open( argv[2] );
+    outputOAindex.open( "/Users/bpaniagua/Work/Projects/CMF/TMJR01/OAIndex/Code/Results/OAindex_groups_cog_scale.csv" );
     outputOAindex << "subjectID,OAindex,GroupReal,GroupAssignment,Classification,2ndAssigGroup,3rdAssigGroup,4thAssigGroup,5thAssigGroup" << std::endl;
 
     int missclassifications = 0;
