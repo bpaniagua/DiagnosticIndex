@@ -148,7 +148,7 @@ vtkPolyData* ScaleVTK (vtkPolyData* reference)
     }
 
     //Calculate Scale
-    double scale = sqrt(sum) / (reference->GetNumberOfPoints()*3);
+    double scale = sqrt(sum);
 
     // Create a New Point Set "scaledpoint" with the scaled Values
     vtkPoints * scaledpoints = vtkPoints::New();
@@ -173,7 +173,65 @@ vtkPolyData* ScaleVTK (vtkPolyData* reference)
     return output;
 }
 
-StatisticalModelType* buildSSM (std::string datadir, std::string filenamereference)
+vtkPolyData* averageVTK (std::string datadir)
+{
+    StringVectorType filenames;
+    getdir(datadir, filenames, ".vtk");
+    if (filenames.size() == 0) {
+        std::cerr << "did not find any vtk files in directory " << datadir << " exiting.";
+    exit(-1);
+    }
+
+    vtkPolyData *polydata0 = loadVTKPolyData(datadir+"/" + filenames[0]);
+    vtkPoints *avgPoints = vtkPoints::New();
+    avgPoints=polydata0->GetPoints();
+
+    int numMeshes = filenames.size();
+    for( int index = 1; index < numMeshes; index++ )
+    {
+      vtkPolyData* polydata = vtkPolyData::New();
+      polydata=loadVTKPolyData(datadir+"/" + filenames[index]);
+
+      vtkPoints *meshPoints = vtkPoints::New();
+      meshPoints=polydata->GetPoints();
+      vtkPoints *tmpPoints = vtkPoints::New();
+      for( unsigned int pointID = 0; pointID < meshPoints->GetNumberOfPoints(); pointID++ )
+      {
+        double curPoint[3];
+        double avgPoint[3];
+        double tmpPoint[3];
+        meshPoints->GetPoint(pointID, curPoint);
+        avgPoints->GetPoint(pointID, avgPoint);
+        for( unsigned int dim = 0; dim < 3; dim++ )
+        {
+            tmpPoint[dim] = curPoint[dim] + avgPoint[dim];
+        }
+        tmpPoints->InsertPoint(pointID, tmpPoint);
+      }
+
+      avgPoints = tmpPoints;
+    }
+
+    vtkPoints *tmpPoints = vtkPoints::New();
+    for( unsigned int pointID = 0; pointID < avgPoints->GetNumberOfPoints(); pointID++ )
+    {
+          double avgPoint[3];
+          double tmpPoint[3];
+              avgPoints->GetPoint(pointID, avgPoint);
+          for( unsigned int dim = 0; dim < 3; dim++ )
+          {
+            tmpPoint[dim] = avgPoint[dim] / (numMeshes + 1);
+          }
+          tmpPoints->InsertPoint(pointID, tmpPoint);
+    }
+    avgPoints = tmpPoints;
+
+    polydata0->SetPoints(avgPoints);
+
+    return polydata0;
+}
+
+StatisticalModelType* buildSSM (std::string datadir, vtkPolyData* reference)
 {
     StringVectorType filenames;
     getdir(datadir, filenames, ".vtk");
@@ -183,7 +241,6 @@ StatisticalModelType* buildSSM (std::string datadir, std::string filenamereferen
     }
 
     std::cout << "Building SSM of data in " << datadir << std::endl;
-    vtkPolyData* reference = loadVTKPolyData(filenamereference);
     boost::scoped_ptr<RepresenterType> representer(RepresenterType::Create(reference));
     // We create a datamanager and provide it with a pointer to the representer
     boost::scoped_ptr<DataManagerType> dataManager(DataManagerType::Create(representer.get()));
@@ -191,17 +248,13 @@ StatisticalModelType* buildSSM (std::string datadir, std::string filenamereferen
     for (unsigned i = 0; i < filenames.size() ; i++)
     {
         vtkPolyData* dataset = loadVTKPolyData(datadir + "/" + filenames[i]);
-        vtkPolyData* datasetS = ScaleVTK(dataset);
+        //vtkPolyData* datasetS = ScaleVTK(dataset);
         // We provde the filename as a second argument.
         // It will be written as metadata, and allows us to more easily figure out what we did later.
-
-        //saveSample(datasetS,"/Users/bpaniagua/Work/Projects/CMF/TMJR01/OAIndex/Code/DiagnosticIndex-build",filenames[i]);
-
-        dataManager->AddDataset(datasetS, filenames[i]);
-
+        dataManager->AddDataset(dataset, filenames[i]);
         // it is save to delete the dataset after it was added, as the datamanager direclty copies it.
         dataset->Delete();
-        datasetS->Delete();
+       //datasetS->Delete();
     }
 
     // To actually build a model, we need to create a model builder object.
@@ -214,7 +267,7 @@ StatisticalModelType* buildSSM (std::string datadir, std::string filenamereferen
     return model;
 }
 
-StatisticalModelType* buildSSMCrossvalidation (std::string datadir, std::string filenamereference, std::string filename)
+StatisticalModelType* buildSSMCrossvalidation (std::string datadir, vtkPolyData* reference, std::string filename)
 {
     StringVectorType filenames;
     getdir(datadir, filenames, ".vtk");
@@ -223,8 +276,6 @@ StatisticalModelType* buildSSMCrossvalidation (std::string datadir, std::string 
     exit(-1);
     }
 
-  //  std::cout << "Building SSM of data in " << datadir << std::endl;
-    vtkPolyData* reference = loadVTKPolyData(filenamereference);
     boost::scoped_ptr<RepresenterType> representer(RepresenterType::Create(reference));
     // We create a datamanager and provide it with a pointer to the representer
     boost::scoped_ptr<DataManagerType> dataManager(DataManagerType::Create(representer.get()));
@@ -234,13 +285,13 @@ StatisticalModelType* buildSSMCrossvalidation (std::string datadir, std::string 
         if (filename.compare(filenames[i]) != 0)
         {
             vtkPolyData* dataset = loadVTKPolyData(datadir + "/" + filenames[i]);
-            vtkPolyData* datasetS = ScaleVTK(dataset);
+            //vtkPolyData* datasetS = ScaleVTK(dataset);
             // We provde the filename as a second argument.
             // It will be written as metadata, and allows us to more easily figure out what we did later.
-            dataManager->AddDataset(datasetS, filenames[i]);
+            dataManager->AddDataset(dataset, filenames[i]);
             // it is save to delete the dataset after it was added, as the datamanager direclty copies it.
             dataset->Delete();
-            datasetS->Delete();
+            //datasetS->Delete();
         }
 
     }
@@ -271,7 +322,7 @@ void analyzeVariance (StatisticalModelType* model)
     }
 }
 
-double ComputeOAindex (StatisticalModelType* model, vtkPolyData* sample, double totalVarPooled, int numOfEigenmodes)
+double ComputeOAindex (StatisticalModelType* model, vtkPolyData* sample, int numOfEigenmodes)
 {
     VectorType ShapeLoads = model->ComputeCoefficientsForDataset(sample);
     VectorType eigenVectors = model->GetPCAVarianceVector();
@@ -296,39 +347,13 @@ double ComputeOAindex (StatisticalModelType* model, vtkPolyData* sample, double 
     return OAindex;
 }
 
-double ComputeOAindex2 (StatisticalModelType* model, vtkPolyData* sample, double totalVarPooled, int numOfEigenmodes)
-{
-
-   VectorType ShapeLoads = model->ComputeCoefficientsForDataset(sample);
-   VectorType eigenVectors = model->GetPCAVarianceVector();
-
-   double OAindex;
-   double sum = 0;
-
-   double finalnumberofeigenmodes;
-
-   if (numOfEigenmodes == -1)
-       finalnumberofeigenmodes = ShapeLoads.size();
-   else
-       finalnumberofeigenmodes = numOfEigenmodes;
-
-   for (unsigned l = 0 ; l < finalnumberofeigenmodes ; l++)
-   {
-       sum = sum + ( pow( (ShapeLoads(l)* (eigenVectors(l))/totalVarPooled ) ,2) );
-   }
-
-   OAindex = sqrt( sum )/finalnumberofeigenmodes;
-
-   return OAindex;
-
-}
-
 int main (int argc, char ** argv)
 {
 
     // Variables that can be changed by the user This will be implemented in the GUI
-    int NumOfGroups = 8;
+    int NumOfGroups = 6;
     int NumOfEigenmodes = atoi(argv[1]);
+    std::string token = "Data-cog-NewGroups";
 
     if( argc < 3 )
     {
@@ -336,22 +361,17 @@ int main (int argc, char ** argv)
         return 0;
     }
 
-    std::string GroupLUT("/Users/bpaniagua/Work/Projects/CMF/TMJR01/OAIndex/Code/DataCO-cog/Grouping/LookUpGroup3.csv");
-    std::string datadirModels("/Users/bpaniagua/Work/Projects/CMF/TMJR01/OAIndex/Code/Data/Grouping/HD5Groups");
+    std::string GroupLUT("/Users/bpaniagua/Work/Projects/CMF/TMJR01/OAIndex/Code/NewGroupsLookUp.csv");
 
-    std::string datadirHC("/Users/bpaniagua/Work/Projects/CMF/TMJR01/OAIndex/Code/DataCO-cog/ControlGroup");
-    std::string datadirOA("/Users/bpaniagua/Work/Projects/CMF/TMJR01/OAIndex/Code/DataCO-cog/OA");
-    std::string datadirBoth("/Users/bpaniagua/Work/Projects/CMF/TMJR01/OAIndex/Code/DataCO-cog/Both");
+    std::string datadirHC("/Users/bpaniagua/Work/Projects/CMF/TMJR01/OAIndex/Code/"+token+"/ControlGroup");
+    std::string datadirOA("/Users/bpaniagua/Work/Projects/CMF/TMJR01/OAIndex/Code/"+token+"/OA");
+    std::string datadirBoth("/Users/bpaniagua/Work/Projects/CMF/TMJR01/OAIndex/Code/"+token+"/Both");
 
-    std::string datadirG01("/Users/bpaniagua/Work/Projects/CMF/TMJR01/OAIndex/Code/DataCO-cog/Grouping/G01");
-    std::string datadirG02("/Users/bpaniagua/Work/Projects/CMF/TMJR01/OAIndex/Code/DataCO-cog/Grouping/G02");
-    std::string datadirG03("/Users/bpaniagua/Work/Projects/CMF/TMJR01/OAIndex/Code/DataCO-cog/Grouping/G03");
-    std::string datadirG04("/Users/bpaniagua/Work/Projects/CMF/TMJR01/OAIndex/Code/DataCO-cog/Grouping/G04");
-    std::string datadirG05("/Users/bpaniagua/Work/Projects/CMF/TMJR01/OAIndex/Code/DataCO-cog/Grouping/G05");
-    std::string datadirG06("/Users/bpaniagua/Work/Projects/CMF/TMJR01/OAIndex/Code/DataCO-cog/Grouping/G06");
-    std::string datadirG07("/Users/bpaniagua/Work/Projects/CMF/TMJR01/OAIndex/Code/DataCO-cog/Grouping/G07");
-
-    std::string datadirRepresenters("/Users/bpaniagua/Work/Projects/CMF/TMJR01/OAIndex/Code/DataCO-cog/Representers");
+    std::string datadirG01("/Users/bpaniagua/Work/Projects/CMF/TMJR01/OAIndex/Code/"+token+"/Grouping/G01");
+    std::string datadirG02("/Users/bpaniagua/Work/Projects/CMF/TMJR01/OAIndex/Code/"+token+"/Grouping/G02");
+    std::string datadirG03("/Users/bpaniagua/Work/Projects/CMF/TMJR01/OAIndex/Code/"+token+"/Grouping/G03");
+    std::string datadirG04("/Users/bpaniagua/Work/Projects/CMF/TMJR01/OAIndex/Code/"+token+"/Grouping/G04");
+    std::string datadirG05("/Users/bpaniagua/Work/Projects/CMF/TMJR01/OAIndex/Code/"+token+"/Grouping/G05");
 
     //Read .CSV look up table with group information and VTK
     vtkSmartPointer<vtkDelimitedTextReader> CSVreader = vtkSmartPointer<vtkDelimitedTextReader>::New();
@@ -374,36 +394,32 @@ int main (int argc, char ** argv)
     //###########################################
     // Build all SSM for all groups
     //##########################################
-    VectorType totalGroupVariances (8);
-    double totalVarPooled=0;
+   // VectorType totalGroupVariances (8);
+   // double totalVarPooled=0;
 
-    std::string representerG01 = datadirRepresenters + "/avgG01.vtk";
+    vtkPolyData* representerG01 = averageVTK(datadirG01);
+    saveSample(representerG01, "/Users/bpaniagua/Work/Projects/CMF/TMJR01/OAIndex/Code/Data-cog-NewGroups/avg/","avgG01.vtk");
     StatisticalModelType* modelG01 = buildSSM(datadirG01,representerG01 );
 
-    std::string representerG02 = datadirRepresenters + "/avgG02.vtk";
+    vtkPolyData* representerG02 = averageVTK(datadirG02);
+    saveSample(representerG02, "/Users/bpaniagua/Work/Projects/CMF/TMJR01/OAIndex/Code/Data-cog-NewGroups/avg/","avgG02.vtk");
     StatisticalModelType* modelG02 = buildSSM(datadirG02,representerG02);
 
-    std::string representerG03 = datadirRepresenters + "/avgG03.vtk";
+    vtkPolyData* representerG03 = averageVTK(datadirG03);
+    saveSample(representerG03, "/Users/bpaniagua/Work/Projects/CMF/TMJR01/OAIndex/Code/Data-cog-NewGroups/avg/","avgG03.vtk");
     StatisticalModelType* modelG03 = buildSSM(datadirG03,representerG03);
 
-    std::string representerG04 = datadirRepresenters + "/avgG04.vtk";
+    vtkPolyData* representerG04 = averageVTK(datadirG04);
+    saveSample(representerG04, "/Users/bpaniagua/Work/Projects/CMF/TMJR01/OAIndex/Code/Data-cog-NewGroups/avg/","avgG04.vtk");
     StatisticalModelType* modelG04 = buildSSM(datadirG04,representerG04);
 
-    std::string representerG05 = datadirRepresenters + "/avgG05.vtk";
+    vtkPolyData* representerG05 = averageVTK(datadirG05);
+    saveSample(representerG05, "/Users/bpaniagua/Work/Projects/CMF/TMJR01/OAIndex/Code/Data-cog-NewGroups/avg/","avgG05.vtk");
     StatisticalModelType* modelG05 = buildSSM(datadirG05,representerG05);
 
-    std::string representerG06 = datadirRepresenters + "/avgG06.vtk";
-    StatisticalModelType* modelG06 = buildSSM(datadirG06,representerG06);
-
-    std::string representerG07 = datadirRepresenters + "/avgG07.vtk";
-    StatisticalModelType* modelG07 = buildSSM(datadirG07,representerG07);
-
-    std::string representerHC = datadirRepresenters + "/avgHC.vtk";
+    vtkPolyData* representerHC = averageVTK(datadirHC);
+    saveSample(representerHC, "/Users/bpaniagua/Work/Projects/CMF/TMJR01/OAIndex/Code/Data-cog-NewGroups/avg/","avgHC.vtk");
     StatisticalModelType* modelHC = buildSSM(datadirHC,representerHC);
-
-   /* std::string representerBoth = datadirRepresenters + "/avgBoth.vtk";
-    StatisticalModelType* modelBoth = buildSSM(datadirBoth, representerBoth);
-    double totalVarBoth = modelBoth->GetPCAVarianceVector().sum();*/
 
     //################################################
 
@@ -467,52 +483,18 @@ int main (int argc, char ** argv)
                         {
                             if ( group == 6 )
                             {
-                                modelG06 = buildSSMCrossvalidation(datadirG06, representerG06, filenamesToClassify[sample]);
+                                modelHC = buildSSMCrossvalidation(datadirHC, representerHC, filenamesToClassify[sample]);
                             }
                             else
                             {
-                                if ( group == 7 )
-                                {
-                                    modelG07 = buildSSMCrossvalidation(datadirG07, representerG07, filenamesToClassify[sample]);
-                                }
-                                else
-                                {
-                                    if ( group == 8 )
-                                    {
-                                       modelHC = buildSSMCrossvalidation(datadirHC, representerHC, filenamesToClassify[sample]);
-                                    }
-                                    else
-                                    {
-                                        std::cerr << "No group information found for " << filenamesToClassify[sample] << std::endl;
-                                        exit(-1);
-                                    }
-                                }
-
+                                std::cerr << "No group information found for " << filenamesToClassify[sample] << std::endl;
+                                exit(-1);
                             }
                         }
                     }
                 }
             }
         }
-
-        //Computing variances per group and pooled
-        totalGroupVariances(0) = modelG01->GetPCAVarianceVector().sum();
-        totalGroupVariances(1) = modelG02->GetPCAVarianceVector().sum();
-        totalGroupVariances(2) = modelG03->GetPCAVarianceVector().sum();
-        totalGroupVariances(3) = modelG04->GetPCAVarianceVector().sum();
-        totalGroupVariances(4) = modelG05->GetPCAVarianceVector().sum();
-        totalGroupVariances(5) = modelG06->GetPCAVarianceVector().sum();
-        totalGroupVariances(6) = modelG07->GetPCAVarianceVector().sum();
-        totalGroupVariances(7) = modelHC->GetPCAVarianceVector().sum();
-
-        double sum = 0;
-        for (int i = 0; i <totalGroupVariances.size(); i++)
-        {
-            sum = sum + totalGroupVariances(i);
-        }
-        totalVarPooled = sum/totalGroupVariances.size();
-
-
 
         // ###################################
         //Computing OAindex for all samples
@@ -526,14 +508,12 @@ int main (int argc, char ** argv)
         double maxOAindex = -1;
         double groupAssignment = 0;
 
-        OAindex_all(0,sample) = ComputeOAindex(modelG01,VTKShapeOA,totalVarPooled,NumOfEigenmodes);
-        OAindex_all(1,sample) = ComputeOAindex(modelG02,VTKShapeOA,totalVarPooled,NumOfEigenmodes);
-        OAindex_all(2,sample) = ComputeOAindex(modelG03,VTKShapeOA,totalVarPooled,NumOfEigenmodes);
-        OAindex_all(3,sample) = ComputeOAindex(modelG04,VTKShapeOA,totalVarPooled,NumOfEigenmodes);
-        OAindex_all(4,sample) = ComputeOAindex(modelG05,VTKShapeOA,totalVarPooled,NumOfEigenmodes);
-        OAindex_all(5,sample) = ComputeOAindex(modelG06,VTKShapeOA,totalVarPooled,NumOfEigenmodes);
-        OAindex_all(6,sample) = ComputeOAindex(modelG07,VTKShapeOA,totalVarPooled,NumOfEigenmodes);
-        OAindex_all(7,sample) = ComputeOAindex(modelHC,VTKShapeOA,totalVarPooled,NumOfEigenmodes);
+        OAindex_all(0,sample) = ComputeOAindex(modelG01,VTKShapeOA,NumOfEigenmodes); //G01
+        OAindex_all(1,sample) = ComputeOAindex(modelG02,VTKShapeOA,NumOfEigenmodes); //G03
+        OAindex_all(2,sample) = ComputeOAindex(modelG03,VTKShapeOA,NumOfEigenmodes); //G04
+        OAindex_all(3,sample) = ComputeOAindex(modelG04,VTKShapeOA,NumOfEigenmodes); //G05
+        OAindex_all(4,sample) = ComputeOAindex(modelG05,VTKShapeOA,NumOfEigenmodes); //G06
+        OAindex_all(5,sample) = ComputeOAindex(modelHC,VTKShapeOA,NumOfEigenmodes); //HC
 
         VectorType col = OAindex_all.col(sample);
         std::sort(col.data(),col.data()+col.size());
@@ -558,7 +538,7 @@ int main (int argc, char ** argv)
     std::cout << "----- Writing OA index results -----" << std::endl;
 //
     std::ofstream outputOAindexAll;
-    outputOAindexAll.open( "/Users/bpaniagua/Work/Projects/CMF/TMJR01/OAIndex/Code/Results/OAindexAll_groups_cog_scale.csv" );
+    outputOAindexAll.open( "/Users/bpaniagua/Work/Projects/CMF/TMJR01/OAIndex/Code/Results/OAindexAll_NewGroups_cog_ID.csv" );
     outputOAindexAll << "GroupID,";
     for (int ij = 0; ij < filenamesToClassify.size()-1; ij ++)
         outputOAindexAll << filenamesToClassify[ij] << "," ;
@@ -576,7 +556,7 @@ int main (int argc, char ** argv)
     outputOAindexAll.close();
 
     std::ofstream outputOAindex;
-    outputOAindex.open( "/Users/bpaniagua/Work/Projects/CMF/TMJR01/OAIndex/Code/Results/OAindex_groups_cog_scale.csv" );
+    outputOAindex.open( "/Users/bpaniagua/Work/Projects/CMF/TMJR01/OAIndex/Code/Results/OAindex_NewGroups_cog_ID.csv" );
     outputOAindex << "subjectID,OAindex,GroupReal,GroupAssignment,Classification,2ndAssigGroup,3rdAssigGroup,4thAssigGroup,5thAssigGroup" << std::endl;
 
     int missclassifications = 0;
